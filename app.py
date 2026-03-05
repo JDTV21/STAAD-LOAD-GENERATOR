@@ -1,7 +1,6 @@
 import streamlit as st
 import math
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # =======================
 # Page Config
@@ -187,7 +186,7 @@ summary_df = pd.DataFrame(summary_data)
 st.table(summary_df)
 
 # =======================
-# Story Forces Chart (Matplotlib)
+# Story Forces (Vertical Distribution)
 # =======================
 st.markdown("### 📊 Vertical Distribution of Seismic Forces")
 stories = st.number_input("Number of Stories", value=3)
@@ -202,17 +201,7 @@ k=1
 sum_wh=sum([weights[i]*(heights[i]**k) for i in range(int(stories))])
 Fx_list=[(weights[i]*(heights[i]**k)/sum_wh)*Vx for i in range(int(stories))]
 df = pd.DataFrame({"Story":[f"Story {i+1}" for i in range(int(stories))], "Fx (kN)": Fx_list})
-st.table(df)
-
-# Bar chart with Matplotlib
-fig, ax = plt.subplots()
-ax.bar(df["Story"], df["Fx (kN)"], color='teal')
-ax.set_ylabel("Fx (kN)")
-ax.set_xlabel("Story")
-ax.set_title("Story Forces Distribution")
-for i, v in enumerate(df["Fx (kN)"]):
-    ax.text(i, v + 50, f"{v:.1f}", ha='center')
-st.pyplot(fig)
+st.bar_chart(df.set_index("Story"))
 
 # =======================
 # Export Option
