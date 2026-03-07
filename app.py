@@ -1,16 +1,16 @@
 import streamlit as st
 
-st.set_page_config(page_title="STAAD Load Generator", layout="wide")
+st.set_page_config(page_title="STAAD RC Designer", layout="wide")
 
-st.title("STAAD Load Generator for RC Design")
-st.subheader("NSCP 2015 + 1997 UBC Seismic Parameters")
+st.title("STAAD RC Designer Load Generator")
+st.subheader("NSCP 2015 + 1997 UBC Seismic Tool")
 st.write("Developed by **ENGR. JONAH DAVE T. VEGA**")
 
 st.divider()
 
-# ------------------------------------------------
+# -------------------------------------------------------
 # UBC 1997 Near Source Tables
-# ------------------------------------------------
+# -------------------------------------------------------
 
 Na_table = {
 "A":[(2,1.5),(5,1.3),(10,1.2),(15,1.1)],
@@ -22,9 +22,9 @@ Nv_table = {
 "B":[(2,1.6),(5,1.4),(10,1.2),(15,1.1)]
 }
 
-# ------------------------------------------------
-# INTERPOLATION FUNCTION
-# ------------------------------------------------
+# -------------------------------------------------------
+# Interpolation
+# -------------------------------------------------------
 
 def interpolate(distance,data):
 
@@ -49,15 +49,52 @@ def interpolate(distance,data):
 
             return y1 + (distance-x1)*(y2-y1)/(x2-x1)
 
-# ------------------------------------------------
-# SEISMIC PARAMETERS
-# ------------------------------------------------
+# -------------------------------------------------------
+# STRUCTURAL SYSTEM
+# -------------------------------------------------------
 
-st.header("Seismic Parameters (1997 UBC)")
+st.header("Structural System")
 
-col1,col2,col3 = st.columns(3)
+col1,col2 = st.columns(2)
 
 with col1:
+
+    material = st.selectbox(
+    "Material",
+    ["Reinforced Concrete","Steel"]
+    )
+
+with col2:
+
+    frame_system = st.selectbox(
+    "Structural System",
+    ["Moment Resisting Frame","Braced Frame","Shear Wall System"]
+    )
+
+# Ct assignment
+
+if material=="Reinforced Concrete" and frame_system=="Moment Resisting Frame":
+    Ct=0.035
+
+elif material=="Steel" and frame_system=="Moment Resisting Frame":
+    Ct=0.028
+
+elif frame_system=="Braced Frame":
+    Ct=0.03
+
+elif frame_system=="Shear Wall System":
+    Ct=0.02
+
+# -------------------------------------------------------
+# SEISMIC PARAMETERS
+# -------------------------------------------------------
+
+st.divider()
+st.header("Seismic Parameters (1997 UBC)")
+
+c1,c2,c3 = st.columns(3)
+
+with c1:
 
     zone = st.selectbox(
     "Seismic Zone Factor Z",
@@ -69,10 +106,10 @@ with col1:
     [1.0,1.25]
     )
 
-with col2:
+with c2:
 
     soil_profile = st.selectbox(
-    "Soil Profile Type",
+    "Soil Profile",
     ["Sa","Sb","Sc","Sd","Se"]
     )
 
@@ -81,7 +118,7 @@ with col2:
     ["A","B"]
     )
 
-with col3:
+with c3:
 
     distance = st.number_input(
     "Distance to Active Fault (km)",
@@ -89,32 +126,38 @@ with col3:
     value=5.0
     )
 
-    building_height = st.number_input(
+    height = st.number_input(
     "Building Height (m)",
     value=15.0
     )
 
-Ct = st.number_input(
-"Ct Coefficient",
-value=0.035
-)
-
-# ------------------------------------------------
-# COMPUTE Na Nv
-# ------------------------------------------------
+# -------------------------------------------------------
+# LIVE Na Nv CALCULATION
+# -------------------------------------------------------
 
 Na = interpolate(distance,Na_table[source_type])
 Nv = interpolate(distance,Nv_table[source_type])
 
-# ------------------------------------------------
-# PERIOD
-# ------------------------------------------------
+T = Ct*(height**0.75)
 
-T = Ct*(building_height**0.75)
+st.subheader("Live Seismic Factors")
 
-# ------------------------------------------------
-# FLOOR DEAD LOADS
-# ------------------------------------------------
+col1,col2,col3 = st.columns(3)
+
+with col1:
+    st.metric("Na",round(Na,3))
+
+with col2:
+    st.metric("Nv",round(Nv,3))
+
+with col3:
+    st.metric("Fundamental Period T (sec)",round(T,3))
+
+st.info(f"Ct used for this structural system = **{Ct}**")
+
+# -------------------------------------------------------
+# FLOOR DEAD LOAD
+# -------------------------------------------------------
 
 st.divider()
 st.header("Floor Dead Loads (NSCP 2015)")
@@ -132,98 +175,79 @@ ceiling_loads={
 "No Ceiling":0
 }
 
-col1,col2,col3 = st.columns(3)
+c1,c2,c3 = st.columns(3)
 
-with col1:
-    floor_type=st.selectbox("Floor Finish",list(floor_loads.keys()))
+with c1:
+    floor_type = st.selectbox("Floor Finish",list(floor_loads.keys()))
 
-with col2:
-    ceiling_type=st.selectbox("Ceiling Type",list(ceiling_loads.keys()))
+with c2:
+    ceiling_type = st.selectbox("Ceiling Type",list(ceiling_loads.keys()))
 
-with col3:
-    partition=st.number_input("Partition Load (kPa)",value=1.0)
+with c3:
+    partition = st.number_input("Partition Load (kPa)",value=1.0)
 
 DL = floor_loads[floor_type] + ceiling_loads[ceiling_type] + partition
 
-# ------------------------------------------------
-# WALL LOAD TO BEAM
-# ------------------------------------------------
+# -------------------------------------------------------
+# WALL LOAD
+# -------------------------------------------------------
 
 st.divider()
 st.header("Wall Load to Beam")
 
-col1,col2,col3 = st.columns(3)
+c1,c2,c3 = st.columns(3)
 
-with col1:
-    wall_height=st.number_input("Wall Height (m)",value=3.0)
+with c1:
+    wall_height = st.number_input("Wall Height (m)",value=3.0)
 
-with col2:
-    wall_thickness=st.number_input("Wall Thickness (m)",value=0.15)
+with c2:
+    wall_thickness = st.number_input("Wall Thickness (m)",value=0.15)
 
-with col3:
-    unit_weight=st.number_input("Wall Unit Weight (kN/m³)",value=18.0)
+with c3:
+    unit_weight = st.number_input("Wall Unit Weight (kN/m³)",value=18.0)
 
-wall_load = wall_height*wall_thickness*unit_weight
+wall_load = wall_height * wall_thickness * unit_weight
 
-# ------------------------------------------------
+# -------------------------------------------------------
 # ROOF LOAD
-# ------------------------------------------------
+# -------------------------------------------------------
 
 st.divider()
 st.header("Roof Dead Loads")
 
 roof_loads={
-"Metal Roof":0.20,
+"Metal Roofing":0.20,
 "Waterproofing":0.25,
-"Green Roof":2.50
+"Roof Garden":2.50
 }
 
-roof_type=st.selectbox("Roof Finish",list(roof_loads.keys()))
+roof_type = st.selectbox("Roof Finish",list(roof_loads.keys()))
+roof_load = roof_loads[roof_type]
 
-roof_load=roof_loads[roof_type]
-
-# ------------------------------------------------
-# STAAD LOAD SUMMARY
-# ------------------------------------------------
+# -------------------------------------------------------
+# STAAD SUMMARY
+# -------------------------------------------------------
 
 st.divider()
-st.header("STAAD LOAD SUMMARY")
+st.header("STAAD INPUT SUMMARY")
 
 c1,c2,c3 = st.columns(3)
 
 with c1:
-    st.metric("Floor Dead Load (kPa)",round(DL,3))
+    st.metric("Floor Dead Load",f"{round(DL,3)} kPa")
 
 with c2:
-    st.metric("Wall Load to Beam (kN/m)",round(wall_load,3))
+    st.metric("Wall Load to Beam",f"{round(wall_load,3)} kN/m")
 
 with c3:
-    st.metric("Roof Dead Load (kPa)",round(roof_load,3))
-
-# ------------------------------------------------
-# SEISMIC RESULTS
-# ------------------------------------------------
-
-st.divider()
-st.header("Computed Seismic Factors")
-
-c1,c2,c3 = st.columns(3)
-
-with c1:
-    st.metric("Na",round(Na,3))
-
-with c2:
-    st.metric("Nv",round(Nv,3))
-
-with c3:
-    st.metric("Period T (sec)",round(T,3))
+    st.metric("Roof Dead Load",f"{round(roof_load,3)} kPa")
 
 st.success(f"""
-Use these loads in **STAAD**:
+Use these values in **STAAD**:
 
-FLOOR LOAD = {round(DL,3)} kPa
+FLOOR LOAD = {round(DL,3)} kPa  
 
-WALL LOAD = {round(wall_load,3)} kN/m
+WALL LOAD = {round(wall_load,3)} kN/m  
 
 ROOF LOAD = {round(roof_load,3)} kPa
 """)
