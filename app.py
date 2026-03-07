@@ -1,253 +1,144 @@
 import streamlit as st
 
-st.set_page_config(page_title="STAAD RC Designer", layout="wide")
+st.set_page_config(page_title="STAAD Load Generator", layout="wide")
 
-st.title("STAAD RC Designer Load Generator")
-st.subheader("NSCP 2015 + 1997 UBC Seismic Tool")
-st.write("Developed by **ENGR. JONAH DAVE T. VEGA**")
-
-st.divider()
-
-# -------------------------------------------------------
-# UBC 1997 Near Source Tables
-# -------------------------------------------------------
-
-Na_table = {
-"A":[(2,1.5),(5,1.3),(10,1.2),(15,1.1)],
-"B":[(2,1.3),(5,1.2),(10,1.1),(15,1.0)]
-}
-
-Nv_table = {
-"A":[(2,2.0),(5,1.6),(10,1.3),(15,1.1)],
-"B":[(2,1.6),(5,1.4),(10,1.2),(15,1.1)]
-}
-
-# -------------------------------------------------------
-# Interpolation
-# -------------------------------------------------------
-
-def interpolate(distance,data):
-
-    x=[i[0] for i in data]
-    y=[i[1] for i in data]
-
-    if distance <= x[0]:
-        return y[0]
-
-    if distance >= x[-1]:
-        return y[-1]
-
-    for i in range(len(x)-1):
-
-        if x[i] <= distance <= x[i+1]:
-
-            x1=x[i]
-            x2=x[i+1]
-
-            y1=y[i]
-            y2=y[i+1]
-
-            return y1 + (distance-x1)*(y2-y1)/(x2-x1)
-
-# -------------------------------------------------------
-# STRUCTURAL SYSTEM
-# -------------------------------------------------------
-
-st.header("Structural System")
-
-col1,col2 = st.columns(2)
-
-with col1:
-
-    material = st.selectbox(
-    "Material",
-    ["Reinforced Concrete","Steel"]
-    )
-
-with col2:
-
-    frame_system = st.selectbox(
-    "Structural System",
-    ["Moment Resisting Frame","Braced Frame","Shear Wall System"]
-    )
-
-# Ct assignment
-
-if material=="Reinforced Concrete" and frame_system=="Moment Resisting Frame":
-    Ct=0.035
-
-elif material=="Steel" and frame_system=="Moment Resisting Frame":
-    Ct=0.028
-
-elif frame_system=="Braced Frame":
-    Ct=0.03
-
-elif frame_system=="Shear Wall System":
-    Ct=0.02
-
-# -------------------------------------------------------
-# SEISMIC PARAMETERS
-# -------------------------------------------------------
+st.title("STAAD Load Input Generator")
+st.write("NSCP 2015 + UBC 1997")
+st.write("Created by **ENGR. JONAH DAVE T. VEGA**")
 
 st.divider()
-st.header("Seismic Parameters (1997 UBC)")
 
-c1,c2,c3 = st.columns(3)
+# --------------------------------------------------
+# PROJECT DATA
+# --------------------------------------------------
 
-with c1:
-
-    zone = st.selectbox(
-    "Seismic Zone Factor Z",
-    [0.15,0.20,0.30,0.40]
-    )
-
-    importance = st.selectbox(
-    "Importance Factor I",
-    [1.0,1.25]
-    )
-
-with c2:
-
-    soil_profile = st.selectbox(
-    "Soil Profile",
-    ["Sa","Sb","Sc","Sd","Se"]
-    )
-
-    source_type = st.selectbox(
-    "Seismic Source Type",
-    ["A","B"]
-    )
-
-with c3:
-
-    distance = st.number_input(
-    "Distance to Active Fault (km)",
-    min_value=0.0,
-    value=5.0
-    )
-
-    height = st.number_input(
-    "Building Height (m)",
-    value=15.0
-    )
-
-# -------------------------------------------------------
-# LIVE Na Nv CALCULATION
-# -------------------------------------------------------
-
-Na = interpolate(distance,Na_table[source_type])
-Nv = interpolate(distance,Nv_table[source_type])
-
-T = Ct*(height**0.75)
-
-st.subheader("Live Seismic Factors")
+st.header("Project Data")
 
 col1,col2,col3 = st.columns(3)
 
 with col1:
-    st.metric("Na",round(Na,3))
+    floors = st.number_input("Number of Floors",value=3)
 
 with col2:
-    st.metric("Nv",round(Nv,3))
+    floor_height = st.number_input("Floor Height (m)",value=3.0)
 
 with col3:
-    st.metric("Fundamental Period T (sec)",round(T,3))
+    building_height = floors * floor_height
+    st.metric("Building Height",f"{building_height} m")
 
-st.info(f"Ct used for this structural system = **{Ct}**")
-
-# -------------------------------------------------------
-# FLOOR DEAD LOAD
-# -------------------------------------------------------
+# --------------------------------------------------
+# DEAD LOADS
+# --------------------------------------------------
 
 st.divider()
-st.header("Floor Dead Loads (NSCP 2015)")
+st.header("Dead Loads (NSCP)")
 
-floor_loads={
-"Ceramic Tiles":0.60,
-"Marble":0.80,
+floor_finish = {
+"Ceramic Tile":0.60,
 "Granite":0.90,
-"Wood Flooring":0.50
+"Marble":0.80,
+"Wood":0.50
 }
 
-ceiling_loads={
-"Gypsum Ceiling":0.25,
-"Acoustic Ceiling":0.30,
+ceiling = {
+"Gypsum Board":0.25,
+"Acoustic":0.30,
 "No Ceiling":0
 }
 
-c1,c2,c3 = st.columns(3)
+roof_finish = {
+"Metal Roof":0.20,
+"Waterproofing":0.25,
+"Green Roof":2.50
+}
 
-with c1:
-    floor_type = st.selectbox("Floor Finish",list(floor_loads.keys()))
+col1,col2,col3 = st.columns(3)
 
-with c2:
-    ceiling_type = st.selectbox("Ceiling Type",list(ceiling_loads.keys()))
+with col1:
+    floor_type = st.selectbox("Floor Finish",floor_finish.keys())
 
-with c3:
+with col2:
+    ceiling_type = st.selectbox("Ceiling Type",ceiling.keys())
+
+with col3:
     partition = st.number_input("Partition Load (kPa)",value=1.0)
 
-DL = floor_loads[floor_type] + ceiling_loads[ceiling_type] + partition
+DL = floor_finish[floor_type] + ceiling[ceiling_type] + partition
 
-# -------------------------------------------------------
+# --------------------------------------------------
 # WALL LOAD
-# -------------------------------------------------------
+# --------------------------------------------------
 
-st.divider()
-st.header("Wall Load to Beam")
+st.header("Wall Load on Beam")
 
-c1,c2,c3 = st.columns(3)
+col1,col2,col3 = st.columns(3)
 
-with c1:
-    wall_height = st.number_input("Wall Height (m)",value=3.0)
+with col1:
+    wall_height = st.number_input("Wall Height",value=3.0)
 
-with c2:
-    wall_thickness = st.number_input("Wall Thickness (m)",value=0.15)
+with col2:
+    wall_thickness = st.number_input("Wall Thickness",value=0.15)
 
-with c3:
-    unit_weight = st.number_input("Wall Unit Weight (kN/m³)",value=18.0)
+with col3:
+    unit_weight = st.number_input("Wall Unit Weight",value=18.0)
 
 wall_load = wall_height * wall_thickness * unit_weight
 
-# -------------------------------------------------------
-# ROOF LOAD
-# -------------------------------------------------------
+# --------------------------------------------------
+# LIVE LOAD
+# --------------------------------------------------
 
 st.divider()
-st.header("Roof Dead Loads")
+st.header("Live Loads")
 
-roof_loads={
-"Metal Roofing":0.20,
-"Waterproofing":0.25,
-"Roof Garden":2.50
+live_load_table = {
+"Residential":2.0,
+"Office":2.4,
+"Corridor":4.8,
+"Stairs":4.8,
+"Roof Live":0.75
 }
 
-roof_type = st.selectbox("Roof Finish",list(roof_loads.keys()))
-roof_load = roof_loads[roof_type]
+occupancy = st.selectbox("Occupancy Type",live_load_table.keys())
 
-# -------------------------------------------------------
-# STAAD SUMMARY
-# -------------------------------------------------------
+LL = live_load_table[occupancy]
+
+# --------------------------------------------------
+# STAAD LOAD SUMMARY
+# --------------------------------------------------
 
 st.divider()
-st.header("STAAD INPUT SUMMARY")
+st.header("STAAD Loads Summary")
 
-c1,c2,c3 = st.columns(3)
+col1,col2,col3 = st.columns(3)
 
-with c1:
-    st.metric("Floor Dead Load",f"{round(DL,3)} kPa")
+with col1:
+    st.metric("Dead Load (Floor)",f"{DL} kPa")
 
-with c2:
-    st.metric("Wall Load to Beam",f"{round(wall_load,3)} kN/m")
+with col2:
+    st.metric("Wall Load",f"{wall_load} kN/m")
 
-with c3:
-    st.metric("Roof Dead Load",f"{round(roof_load,3)} kPa")
+with col3:
+    st.metric("Live Load",f"{LL} kPa")
 
-st.success(f"""
-Use these values in **STAAD**:
+# --------------------------------------------------
+# STAAD COMMAND GENERATOR
+# --------------------------------------------------
 
-FLOOR LOAD = {round(DL,3)} kPa  
+st.divider()
+st.header("STAAD Command Output")
 
-WALL LOAD = {round(wall_load,3)} kN/m  
+staad_text = f"""
+LOAD 1 DEAD LOAD
+FLOOR LOAD
+YRANGE 0 {floor_height} FLOAD -{DL}
 
-ROOF LOAD = {round(roof_load,3)} kPa
-""")
+MEMBER LOAD
+UNI GY -{wall_load}
+
+LOAD 2 LIVE LOAD
+FLOOR LOAD
+YRANGE 0 {floor_height} FLOAD -{LL}
+"""
+
+st.code(staad_text)
