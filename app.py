@@ -4,7 +4,6 @@ st.set_page_config(page_title="STAAD Structural Load Generator", layout="wide")
 
 st.title("STAAD Structural Load Generator")
 st.write("NSCP 2015 + UBC 1997")
-st.write("Developed by **ENGR. JONAH DAVE T. VEGA**")
 
 st.divider()
 
@@ -261,3 +260,4 @@ RZ {R}
 """
 
 st.code(staad)
+
