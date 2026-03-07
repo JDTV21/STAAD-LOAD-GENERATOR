@@ -1,262 +1,241 @@
 import streamlit as st
-import math
 
-st.set_page_config(page_title="PH Structural Load Engine", layout="centered")
+st.set_page_config(page_title="STAAD RC Designer", layout="wide")
 
-st.title("🏗️ PH Structural Load Engine")
-st.subheader("STAAD Load Generator")
-st.caption("Developed by ENGR. JONAH DAVE T. VEGA")
+st.title("STAAD RC Designer Load Generator")
+st.subheader("NSCP 2015 + 1997 UBC Seismic Tool")
+st.write("Created by **ENGR. JONAH DAVE T. VEGA**")
 
-st.markdown("---")
+st.divider()
 
-# ==========================
-# MATERIAL PROPERTIES
-# ==========================
+# =========================================================
+# NEAR SOURCE TABLES (1997 UBC)
+# =========================================================
 
-st.header("Material Properties")
+Na_table = {
+    "A": [(2,1.5),(5,1.3),(10,1.2),(15,1.1)],
+    "B": [(2,1.3),(5,1.2),(10,1.1),(15,1.0)]
+}
 
-concrete = st.number_input("Concrete Unit Weight (kN/m³)", value=24.0)
-masonry = st.number_input("Masonry / CHB Unit Weight (kN/m³)", value=20.0)
+Nv_table = {
+    "A": [(2,2.0),(5,1.6),(10,1.3),(15,1.1)],
+    "B": [(2,1.6),(5,1.4),(10,1.2),(15,1.1)]
+}
 
-# ==========================
-# FLOOR LOAD
-# ==========================
+def interpolate(distance, table):
 
-st.header("Floor Loads (NSCP 2015)")
+    distances=[x[0] for x in table]
+    values=[x[1] for x in table]
 
-slab_thickness = st.number_input("Slab Thickness (m)", value=0.15)
+    if distance<=distances[0]:
+        return values[0]
 
-finish = st.selectbox(
+    if distance>=distances[-1]:
+        return values[-1]
+
+    for i in range(len(distances)-1):
+
+        if distances[i] <= distance <= distances[i+1]:
+
+            x1=distances[i]
+            x2=distances[i+1]
+
+            y1=values[i]
+            y2=values[i+1]
+
+            return y1 + (distance-x1)*(y2-y1)/(x2-x1)
+
+# =========================================================
+# SIDEBAR INPUT
+# =========================================================
+
+st.sidebar.header("Project Parameters")
+
+zone = st.sidebar.selectbox(
+"Seismic Zone",
+[0.15,0.20,0.30,0.40]
+)
+
+importance = st.sidebar.selectbox(
+"Importance Factor (I)",
+[1.0,1.25]
+)
+
+soil = st.sidebar.selectbox(
+"Soil Profile",
+["Sa","Sb","Sc","Sd","Se"]
+)
+
+source_type = st.sidebar.selectbox(
+"Seismic Source Type",
+["A","B"]
+)
+
+distance = st.sidebar.slider(
+"Distance to Active Fault (km)",
+0.0,20.0,5.0
+)
+
+height = st.sidebar.number_input(
+"Building Height (m)",
+value=15.0
+)
+
+Ct = st.sidebar.number_input(
+"Ct Coefficient",
+value=0.035
+)
+
+# =========================================================
+# COMPUTE Na Nv
+# =========================================================
+
+Na = interpolate(distance, Na_table[source_type])
+Nv = interpolate(distance, Nv_table[source_type])
+
+# =========================================================
+# PERIOD
+# =========================================================
+
+T = Ct * (height**0.75)
+
+# =========================================================
+# LOAD INPUTS
+# =========================================================
+
+st.header("Dead Loads (NSCP 2015)")
+
+floor_finish = st.selectbox(
 "Floor Finish",
-[
-"Ceramic Tile (1.0)",
-"Granite (1.2)",
-"Wood (0.8)"
-]
+{
+"Ceramic Tiles":0.60,
+"Marble":0.80,
+"Granite":0.90,
+"Wood Flooring":0.50
+}
 )
 
 ceiling = st.selectbox(
 "Ceiling Load",
-[
-"Gypsum (0.25)",
-"Plaster (0.5)",
-"None (0)"
-]
+{
+"Gypsum Board":0.25,
+"Acoustic Ceiling":0.30,
+"None":0.0
+}
 )
 
-partition = st.selectbox(
-"Partition Load",
-[
-"Light (1.0)",
-"Heavy (2.0)",
-"None (0)"
-]
+partition = st.number_input(
+"Partition Load (kPa)",
+value=1.0
 )
 
-LL = st.number_input("Live Load (kN/m²)", value=2.0)
+# values
+floor_load={
+"Ceramic Tiles":0.60,
+"Marble":0.80,
+"Granite":0.90,
+"Wood Flooring":0.50
+}[floor_finish]
 
-finish_dict = {
-"Ceramic Tile (1.0)":1.0,
-"Granite (1.2)":1.2,
-"Wood (0.8)":0.8
-}
+ceiling_load={
+"Gypsum Board":0.25,
+"Acoustic Ceiling":0.30,
+"None":0.0
+}[ceiling]
 
-ceiling_dict = {
-"Gypsum (0.25)":0.25,
-"Plaster (0.5)":0.5,
-"None (0)":0
-}
+DL = floor_load + ceiling_load + partition
 
-partition_dict = {
-"Light (1.0)":1.0,
-"Heavy (2.0)":2.0,
-"None (0)":0
-}
-
-slab_sw = concrete * slab_thickness
-
-floor_dead = slab_sw + finish_dict[finish] + ceiling_dict[ceiling] + partition_dict[partition]
-
-# ==========================
-# ROOF LOAD
-# ==========================
-
-st.header("Roof Loads")
-
-roof_finish = st.selectbox(
-"Roof Type",
-[
-"Metal Roof (0.75)",
-"RC Roof w/ Tiles (1.0)",
-"RC Roof w/ Waterproofing (1.25)"
-]
-)
-
-roof_live = st.number_input("Roof Live Load (kN/m²)", value=0.75)
-
-roof_dict = {
-"Metal Roof (0.75)":0.75,
-"RC Roof w/ Tiles (1.0)":1.0,
-"RC Roof w/ Waterproofing (1.25)":1.25
-}
-
-roof_dead = roof_dict[roof_finish]
-
-# ==========================
+# =========================================================
 # WALL LOAD
-# ==========================
+# =========================================================
 
 st.header("Wall Load to Beam")
 
-wall_height = st.number_input("Wall Height (m)", value=3.0)
-wall_thickness = st.number_input("Wall Thickness (m)", value=0.15)
-
-wall_load = masonry * wall_height * wall_thickness
-
-# ==========================
-# WIND LOAD
-# ==========================
-
-st.header("Wind Load")
-
-wind_speed = st.number_input("Basic Wind Speed (kph)", value=250.0)
-
-V = wind_speed / 3.6
-
-wind_pressure = 0.613 * V**2 / 1000
-
-# ==========================
-# SEISMIC LOAD (UBC 1997)
-# ==========================
-
-st.header("Seismic Load (UBC 1997)")
-
-zone = st.selectbox(
-"Seismic Zone",
-[
-"Zone 4 (0.40)",
-"Zone 3 (0.30)",
-"Zone 2B (0.20)"
-]
+wall_height = st.number_input(
+"Wall Height (m)",
+value=3.0
 )
 
-zone_dict = {
-"Zone 4 (0.40)":0.40,
-"Zone 3 (0.30)":0.30,
-"Zone 2B (0.20)":0.20
-}
-
-Z = zone_dict[zone]
-
-importance = st.number_input("Importance Factor I", value=1.0)
-
-R = st.number_input("Response Modification Factor R", value=8.5)
-
-# ==========================
-# SOIL PROFILE TYPE
-# ==========================
-
-soil = st.selectbox(
-"Soil Profile Type",
-["SA","SB","SC","SD","SE"]
+wall_thickness = st.number_input(
+"Wall Thickness (m)",
+value=0.15
 )
 
-Ca_dict = {
-"SA":0.32,
-"SB":0.40,
-"SC":0.44,
-"SD":0.50,
-"SE":0.60
+unit_weight = st.number_input(
+"Wall Unit Weight (kN/m³)",
+value=18.0
+)
+
+wall_load = wall_height * wall_thickness * unit_weight
+
+# =========================================================
+# ROOF LOADS
+# =========================================================
+
+st.header("Roof Dead Loads")
+
+roof_finish = st.selectbox(
+"Roof Finish",
+{
+"Metal Roofing":0.20,
+"Waterproofing":0.25,
+"Roof Garden":2.50
 }
+)
 
-Cv_dict = {
-"SA":0.32,
-"SB":0.50,
-"SC":0.64,
-"SD":0.84,
-"SE":0.96
-}
+roof_load={
+"Metal Roofing":0.20,
+"Waterproofing":0.25,
+"Roof Garden":2.50
+}[roof_finish]
 
-Ca = Ca_dict[soil]
-Cv = Cv_dict[soil]
+# =========================================================
+# SUMMARY (TOP SECTION FOR STAAD)
+# =========================================================
 
-# ==========================
-# NEAR SOURCE FACTORS
-# ==========================
+st.divider()
+st.header("STAAD INPUT SUMMARY")
 
-st.subheader("Near Source Factors")
+col1,col2,col3 = st.columns(3)
 
-distance = st.number_input("Distance to Active Fault (km)", value=10.0)
+with col1:
+    st.metric("Floor Dead Load (kPa)",round(DL,3))
 
-def interpolate(x1,x2,y1,y2,x):
-    return y1 + (y2-y1)*(x-x1)/(x2-x1)
+with col2:
+    st.metric("Wall Load to Beam (kN/m)",round(wall_load,3))
 
-if distance <= 2:
-    Na = 1.3
-    Nv = 1.6
+with col3:
+    st.metric("Roof Load (kPa)",round(roof_load,3))
 
-elif distance <= 5:
-    Na = interpolate(2,5,1.3,1.1,distance)
-    Nv = interpolate(2,5,1.6,1.3,distance)
+# =========================================================
+# SEISMIC RESULTS
+# =========================================================
 
-elif distance <= 10:
-    Na = interpolate(5,10,1.1,1.0,distance)
-    Nv = interpolate(5,10,1.3,1.0,distance)
+st.divider()
+st.header("Seismic Parameters (1997 UBC)")
 
-else:
-    Na = 1.0
-    Nv = 1.0
+c1,c2,c3 = st.columns(3)
 
-st.write("Na =", round(Na,3))
-st.write("Nv =", round(Nv,3))
+with c1:
+    st.metric("Na",round(Na,3))
 
-# ==========================
-# BUILDING PERIOD
-# ==========================
+with c2:
+    st.metric("Nv",round(Nv,3))
 
-st.subheader("Building Period")
+with c3:
+    st.metric("Period T (sec)",round(T,3))
 
-height = st.number_input("Building Height (m)", value=12.0)
+st.info("""
+Use the loads above directly in **STAAD load definitions**.
 
-Ct = 0.0731
-x = 0.75
+Example:
 
-T = Ct * height**x
+FLOOR LOAD  
+`{}` kPa  
 
-st.write("Approximate Period T =", round(T,3), "sec")
+WALL LOAD ON BEAM  
+`{}` kN/m  
 
-# ==========================
-# SEISMIC WEIGHT
-# ==========================
-
-W = st.number_input("Total Seismic Weight W (kN)", value=10000.0)
-
-# ==========================
-# BASE SHEAR
-# ==========================
-
-Cs = Z * I * Ca * Na / R
-
-V = Cs * W
-
-# ==========================
-# SUMMARY
-# ==========================
-
-st.markdown("---")
-st.header("STAAD Load Summary")
-
-st.write("Floor Dead Load:", round(floor_dead,2),"kN/m²")
-st.write("Floor Live Load:", round(LL,2),"kN/m²")
-
-st.write("Roof Dead Load:", round(roof_dead,2),"kN/m²")
-st.write("Roof Live Load:", round(roof_live,2),"kN/m²")
-
-st.write("Wall Load:", round(wall_load,2),"kN/m")
-
-st.write("Wind Pressure:", round(wind_pressure,3),"kN/m²")
-
-st.write("Na:", round(Na,3))
-st.write("Nv:", round(Nv,3))
-
-st.write("Base Shear V:", round(V,2),"kN")
+ROOF LOAD  
+`{}` kPa
+""".format(round(DL,3),round(wall_load,3),round(roof_load,3)))
